@@ -1,34 +1,28 @@
-const { verifyToken } = require('../utils/jwt');
+const jwt = require('jsonwebtoken');
 
-const auth = (req, res, next) => {
+exports.verifyToken = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token tidak ditemukan, silakan login'
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Akses ditolak. Token tidak ditemukan.' 
       });
     }
 
     const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const decoded = verifyToken(token);
-    req.user = { id: decoded.id, role: decoded.role };
-
+    req.user = decoded;
     next();
-  } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token sudah kedaluwarsa, silakan login ulang'
-      });
+  } catch (error) {
+    console.error('Error JWT:', error.message);
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token sudah kadaluwarsa. Silakan login ulang.' });
     }
-    return res.status(401).json({
-      success: false,
-      message: 'Token tidak valid'
-    });
+    
+    return res.status(401).json({ success: false, message: 'Token tidak valid.' });
   }
 };
-
-module.exports = auth;

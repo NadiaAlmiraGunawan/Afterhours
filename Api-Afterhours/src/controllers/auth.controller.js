@@ -1,106 +1,116 @@
-const bcrypt = require("bcrypt");
-const db = require("../config/db");
-const { generateToken } = require("../utils/jwt");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
-const register = async (req, res) => {
+// Memanggil users.models (pakai 's' dan titik sesuai nama file kamu)
+const UserModel = require('../models/users.models');
+
+exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Nama, email, dan password wajib diisi",
-      });
+      return res.status(400).json({ success: false, message: 'Nama, email, dan password wajib diisi' });
     }
+
     if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "Password minimal 6 karakter",
-      });
+      return res.status(400).json({ success: false, message: 'Password minimal 6 karakter' });
     }
 
-    const [existing] = await db.query("SELECT id FROM users WHERE email = ?", [
+    const existingUser = await UserModel.findByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'Email sudah terdaftar' });
+    }
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const newUserId = await UserModel.create({
+      name,
       email,
-    ]);
-    if (existing.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: "Email sudah terdaftar",
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const [result] = await db.query(
-      "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-      [name, email, hashedPassword, "customer"],
-    );
+      password: hashedPassword,
+      role: 'customer'
+    });
 
     res.status(201).json({
       success: true,
-      message: "Registrasi berhasil",
-      data: { id: result.insertId, name, email, role: "customer" },
+      message: 'Registrasi berhasil',
+      data: { id: newUserId, name, email, role: 'customer' }
     });
-  } catch (err) {
-    console.error("Register error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+
+  } catch (error) {
+    console.error('Error saat register:', error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const login = async (req, res) => {
+exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 1. Validasi input
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email dan password wajib diisi",
-      });
+      return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
     }
 
-    const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
-    if (rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Email atau password salah",
-      });
+    // 2. Cari user berdasarkan email
+    const user = await UserModel.findByEmail(email);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Email atau password salah' });
     }
 
-    const user = rows[0];
-
+    // 3. Cocokkan password yang diinput dengan hash di database
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Email atau password salah",
-      });
+      return res.status(401).json({ success: false, message: 'Email atau password salah' });
     }
 
-    const token = generateToken({ id: user.id, role: user.role });
+    // 4. Buat JWT Token
+    const payload = {
+      id: user.id,
+      role: user.role
+    };
 
-    res.json({
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+    });
+
+    // 5. Kirim response (JANGAN kirim password!)
+    res.status(200).json({
       success: true,
-      message: "Login berhasil",
+      message: 'Login berhasil',
       data: {
-        token,
+        token: token,
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
-        },
-      },
+          role: user.role
+        }
+      }
     });
-  } catch (err) {
-    console.error("Login error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+
+  } catch (error) {
+    console.error('Error saat login:', error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
+// TAMBAHKAN FUNGSI INI
+exports.getMe = async (req, res) => {
+  try {
+    // req.user didapat dari authMiddleware
+    const user = await UserModel.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    }
 
-module.exports = { register, login };
+    res.status(200).json({
+      success: true,
+      message: 'Data user berhasil diambil',
+      data: user
+    });
+  } catch (error) {
+    console.error('Error getMe:', error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
+  }
+};

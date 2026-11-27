@@ -1,22 +1,15 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { register, login } = require("../controllers/auth.controller");
-const auth = require("../middlewares/auth.middleware");
-const authorize = require("../middlewares/authorize.middleware");
+const authController = require('../controllers/auth.controller');
 
-router.post("/register", register);
-router.post("/login", login);
+// TAMBAHKAN BARIS IMPORT INI:
+const { verifyToken } = require('../middlewares/auth.middleware');
 
-router.get("/me", auth, (req, res) => {
-  res.json({ success: true, message: "Token valid", data: req.user });
-});
+// Endpoint public
+router.post('/register', authController.register);
+router.post('/login', authController.login);
 
-router.get("/admin", auth, authorize("admin"), (req, res) => {
-  res.json({
-    success: true,
-    message: "Selamat datang, admin!",
-    data: req.user,
-  });
-});
+// Endpoint private (butuh login)
+router.get('/me', verifyToken, authController.getMe);
 
 module.exports = router;
