@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Environment variables (RAHASIA - jangan pernah di-commit!)
+.env
+.env.local
+.env.*.local
+
+# Uploads (file user, bukan kode)
+uploads/*
+!uploads/.gitkeep
