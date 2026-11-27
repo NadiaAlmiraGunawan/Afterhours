@@ -1,41 +1,32 @@
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
-// Pastikan folder uploads ada
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Konfigurasi penyimpanan
+// 1. Atur tempat penyimpanan dan nama file
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // Folder tempat menyimpan gambar
   },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
+  filename: function (req, file, cb) {
+    // Buat nama file unik: produk-171234567.jpg
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname); // Ambil ekstensi (.jpg, .png)
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
   }
 });
 
-// Filter: hanya gambar___
+// 2. Filter hanya file gambar
 const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|webp/;
-  const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mimeOk = allowed.test(file.mimetype);
-
-  if (extOk && mimeOk) {
+  if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
-    cb(new Error('Hanya file gambar (jpg, jpeg, png, webp) yang diizinkan'));
+    cb(new Error('Hanya file gambar yang diizinkan!'), false);
   }
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: Number(process.env.MAX_FILE_SIZE) || 2 * 1024 * 1024 }
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // Maksimal 5 MB
 });
 
 module.exports = upload;

@@ -1,243 +1,97 @@
-const db = require('../config/db');
-const fs = require('fs');
+const ProductModel = require('../models/product.models');
+const fs = require('fs'); // Untuk menghapus file gambar lama
 const path = require('path');
 
-const getAll = async (req, res) => {
+exports.getAllProducts = async (req, res) => {
   try {
-    const { category_id } = req.query;
-
-    let sql = `
-      SELECT p.*, c.name AS category_name
-      FROM products p
-      JOIN categories c ON p.category_id = c.id
-    `;
-    const params = [];
-
-    if (category_id) {
-      sql += ' WHERE p.category_id = ?';
-      params.push(category_id);
-    }
-
-    sql += ' ORDER BY p.id ASC';
-
-    const [rows] = await db.query(sql, params);
-    res.json({ success: true, data: rows });
-  } catch (err) {
-    console.error('getAll products error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+    const products = await ProductModel.getAll();
+    res.status(200).json({ success: true, data: products });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const getById = async (req, res) => {
+exports.createProduct = async (req, res) => {
   try {
-    const { id } = req.params;
-    const [rows] = await db.query(
-      `SELECT p.*, c.name AS category_name
-       FROM products p
-       JOIN categories c ON p.category_id = c.id
-       WHERE p.id = ?`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
+    const { category_id, name, description, price, stock } = req.body;
+    
+    // Validasi input
+    if (!category_id || !name || !price) {
+      // Hapus gambar yang sudah terlanjur di-upload jika validasi gagal
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, message: 'Kategori, nama, dan harga wajib diisi' });
     }
 
-    res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    console.error('getById product error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
-  }
-};
+    // Ambil nama file gambar dari Multer (jika ada)
+    const image = req.file ? req.file.filename : null;
 
-const create = async (req, res) => {
-  try {
-    const { category_id, name, description, price, is_available } = req.body;
-
-    if (!category_id || !name || price === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'category_id, name, dan price wajib diisi'
-      });
-    }
-
-    const priceNum = Number(price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({ success: false, message: 'Harga tidak valid' });
-    }
-
-    const [cat] = await db.query('SELECT id FROM categories WHERE id = ?', [category_id]);
-    if (cat.length === 0) {
-      return res.status(400).json({ success: false, message: 'Kategori tidak ditemukan' });
-    }
-
-    const [result] = await db.query(
-      `INSERT INTO products (category_id, name, description, price, image, is_available)
-       VALUES (?, ?, ?, ?, NULL, ?)`,
-      [
-        category_id,
-        name,
-        description || null,
-        priceNum,
-        is_available === undefined ? 1 : (is_available ? 1 : 0)
-      ]
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'Produk berhasil dibuat',
-      data: {
-        id: result.insertId,
-        category_id: Number(category_id),
-        name,
-        description: description || null,
-        price: priceNum,
-        image: null,
-        is_available: is_available === undefined ? 1 : (is_available ? 1 : 0)
-      }
+    const newId = await ProductModel.create({
+      category_id, name, description, price, stock, image
     });
-  } catch (err) {
-    console.error('create product error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
-  }
-};
 
-const update = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { category_id, name, description, price, is_available } = req.body;
-
-    const [existing] = await db.query('SELECT * FROM products WHERE id = ?', [id]);
-    if (existing.length === 0) {
-      return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
-    }
-
-    if (!category_id || !name || price === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'category_id, name, dan price wajib diisi'
-      });
-    }
-
-    const priceNum = Number(price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      return res.status(400).json({ success: false, message: 'Harga tidak valid' });
-    }
-
-    const [cat] = await db.query('SELECT id FROM categories WHERE id = ?', [category_id]);
-    if (cat.length === 0) {
-      return res.status(400).json({ success: false, message: 'Kategori tidak ditemukan' });
-    }
-
-    const available = is_available === undefined
-      ? existing[0].is_available
-      : (is_available ? 1 : 0);
-
-    await db.query(
-      `UPDATE products
-       SET category_id = ?, name = ?, description = ?, price = ?, is_available = ?
-       WHERE id = ?`,
-      [category_id, name, description || null, priceNum, available, id]
-    );
-
-    res.json({
-      success: true,
-      message: 'Produk berhasil diperbarui',
-      data: {
-        id: Number(id),
-        category_id: Number(category_id),
-        name,
-        description: description || null,
-        price: priceNum,
-        image: existing[0].image,
-        is_available: available
-      }
+    res.status(201).json({ 
+      success: true, 
+      message: 'Produk berhasil ditambahkan',
+      data: { id: newId, name, image }
     });
-  } catch (err) {
-    console.error('update product error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+  } catch (error) {
+    console.error(error);
+    if (req.file) fs.unlinkSync(req.file.path); // Hapus file jika DB error
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const remove = async (req, res) => {
+exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const [existing] = await db.query('SELECT id FROM products WHERE id = ?', [id]);
-    if (existing.length === 0) {
+    const { category_id, name, description, price, stock } = req.body;
+    
+    const existingProduct = await ProductModel.getById(id);
+    if (!existingProduct) {
+      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
     }
 
-    const [used] = await db.query('SELECT id FROM order_items WHERE product_id = ? LIMIT 1', [id]);
-    if (used.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Produk tidak bisa dihapus karena sudah ada di pesanan'
-      });
-    }
+    const image = req.file ? req.file.filename : null;
 
-    await db.query('DELETE FROM products WHERE id = ?', [id]);
-    res.json({ success: true, message: 'Produk berhasil dihapus' });
-  } catch (err) {
-    console.error('delete product error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
-  }
-};
-
-const uploadImage = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'File gambar wajib diunggah' });
-    }
-
-    const [existing] = await db.query('SELECT * FROM products WHERE id = ?', [id]);
-    if (existing.length === 0) {
-      fs.unlinkSync(req.file.path);
-      return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
-    }
-
-    if (existing[0].image) {
-      const oldPath = path.join(__dirname, '../../uploads', existing[0].image);
+    // Jika ada gambar baru, hapus gambar lama dari folder uploads
+    if (image && existingProduct.image) {
+      const oldPath = path.join(__dirname, '../../uploads', existingProduct.image);
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     }
 
-    const imageName = req.file.filename;
-    await db.query('UPDATE products SET image = ? WHERE id = ?', [imageName, id]);
-
-    res.json({
-      success: true,
-      message: 'Gambar berhasil diunggah',
-      data: { id: Number(id), image: imageName, url: `/uploads/${imageName}` }
+    await ProductModel.update(id, {
+      category_id, name, description, price, stock, image
     });
-  } catch (err) {
-    console.error('uploadImage error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+
+    res.status(200).json({ success: true, message: 'Produk berhasil diupdate' });
+  } catch (error) {
+    console.error(error);
+    if (req.file) fs.unlinkSync(req.file.path);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const deleteImage = async (req, res) => {
+exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const [existing] = await db.query('SELECT * FROM products WHERE id = ?', [id]);
-    if (existing.length === 0) {
+    const product = await ProductModel.getById(id);
+    
+    if (!product) {
       return res.status(404).json({ success: false, message: 'Produk tidak ditemukan' });
     }
-    if (!existing[0].image) {
-      return res.status(400).json({ success: false, message: 'Produk tidak punya gambar' });
+
+    // Hapus file gambar dari folder uploads
+    if (product.image) {
+      const imgPath = path.join(__dirname, '../../uploads', product.image);
+      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    const filePath = path.join(__dirname, '../../uploads', existing[0].image);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-    await db.query('UPDATE products SET image = NULL WHERE id = ?', [id]);
-    res.json({ success: true, message: 'Gambar berhasil dihapus' });
-  } catch (err) {
-    console.error('deleteImage error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+    await ProductModel.delete(id);
+    res.status(200).json({ success: true, message: 'Produk berhasil dihapus' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
-
-module.exports = { getAll, getById, create, update, remove, uploadImage, deleteImage };

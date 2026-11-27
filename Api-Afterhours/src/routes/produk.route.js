@@ -1,30 +1,18 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const {
-  getAll,
-  getById,
-  create,
-  update,
-  remove,
-  uploadImage,
-  deleteImage,
-} = require("../controllers/produk.controller");
-const auth = require("../middlewares/auth.middleware");
-const authorize = require("../middlewares/authorize.middleware");
-const upload = require("../middlewares/upload.middleware");
+const productController = require('../controllers/produk.controller');
 
-router.get("/", auth, getAll);
-router.get("/:id", auth, getById);
-router.post("/", auth, authorize("admin"), create);
-router.put("/:id", auth, authorize("admin"), update);
-router.delete("/:id", auth, authorize("admin"), remove);
-router.post(
-  "/:id/image",
-  auth,
-  authorize("admin"),
-  upload.single("image"),
-  uploadImage,
-);
-router.delete("/:id/image", auth, authorize("admin"), deleteImage);
+// Memanggil middleware
+const { verifyToken } = require('../middlewares/auth.middleware');
+const { isAdmin } = require('../middlewares/role.middleware');
+const upload = require('../middlewares/upload.middleware');
+
+// Public (Siapa saja bisa lihat produk)
+router.get('/', productController.getAllProducts);
+
+// Private Admin (Gunakan upload.single('image') untuk menangkap 1 file gambar)
+router.post('/', verifyToken, isAdmin, upload.single('image'), productController.createProduct);
+router.put('/:id', verifyToken, isAdmin, upload.single('image'), productController.updateProduct);
+router.delete('/:id', verifyToken, isAdmin, productController.deleteProduct);
 
 module.exports = router;
