@@ -6,6 +6,7 @@ const categoryRoutes = require("./routes/category.route");
 const productRoutes = require("./routes/produk.route");
 const tableRoutes = require("./routes/table.route");
 const reservationRoutes = require("./routes/reservation.route");
+const orderRoutes = require('./routes/orders.route');
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/tables", tableRoutes);
 app.use("/api/reservations", reservationRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.get("/", (req, res) => {
   res.json({ success: true, message: "Afterhours API is running" });
