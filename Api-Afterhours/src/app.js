@@ -1,29 +1,27 @@
-const express = require('express');
-const path = require('path');
+const express = require("express");
+const path = require("path");
 
-// Import Routes
-const authRoutes = require('./routes/auth.route');
-const categoryRoutes = require('./routes/category.route');
-const productRoutes = require('./routes/produk.route');
+const authRoutes = require("./routes/auth.route");
+const categoryRoutes = require("./routes/category.route");
+const productRoutes = require("./routes/produk.route");
+const tableRoutes = require("./routes/table.route");
+const reservationRoutes = require("./routes/reservation.route");
 
 const app = express();
 
-// Middleware Global
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Folder Static (untuk akses gambar)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// Daftarkan Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/products', productRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/tables", tableRoutes);
+app.use("/api/reservations", reservationRoutes);
 
-// Endpoint Root (Health Check)
-app.get('/', (req, res) => {
-  res.json({ success: true, message: 'Afterhours API is running' });
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "Afterhours API is running" });
 });
 
-// Ekspor app agar bisa dipakai oleh server.js
 module.exports = app;
