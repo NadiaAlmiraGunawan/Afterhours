@@ -1,21 +1,17 @@
 const db = require('../config/db');
 
 const OrderModel = {
-  // Membuat pesanan baru dengan transaksi (semua berhasil atau semua batal)
   createOrder: async (userId, totalPrice, items) => {
-    const connection = await db.getConnection(); // Ambil koneksi khusus untuk transaksi
-    
+    const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
 
-      // 1. Simpan ke tabel orders
       const [orderResult] = await connection.query(
         'INSERT INTO orders (user_id, total_price, status) VALUES (?, ?, ?)',
         [userId, totalPrice, 'pending']
       );
       const orderId = orderResult.insertId;
 
-      // 2. Simpan ke tabel order_items
       for (let item of items) {
         await connection.query(
           'INSERT INTO order_items (order_id, product_id, quantity, price_at_time, subtotal) VALUES (?, ?, ?, ?, ?)',
@@ -27,27 +23,23 @@ const OrderModel = {
       return orderId;
 
     } catch (error) {
-      await connection.rollback(); // Batalkan semua jika ada error
+      await connection.rollback();
       throw error;
     } finally {
-      connection.release(); // Kembalikan koneksi ke pool
+      connection.release();
     }
   },
 
-  // Ambil riwayat pesanan milik customer tertentu
   getByUserId: async (userId) => {
     const query = 'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC';
     const [rows] = await db.query(query, [userId]);
     return rows;
   },
 
-  // Ambil detail pesanan (beserta item-itemnya)
   getOrderDetails: async (orderId) => {
-    // Ambil data order
     const [orderRows] = await db.query('SELECT * FROM orders WHERE id = ?', [orderId]);
     if (orderRows.length === 0) return null;
 
-    // Ambil data item yang dibeli
     const queryItems = `
       SELECT oi.*, p.name AS product_name, p.image AS product_image 
       FROM order_items oi
@@ -62,7 +54,6 @@ const OrderModel = {
     };
   },
 
-  // Admin: Ambil semua pesanan
   getAllOrders: async () => {
     const query = `
       SELECT o.*, u.name AS customer_name 
@@ -76,6 +67,15 @@ const OrderModel = {
 
   updateStatus: async (orderId, status) => {
     await db.query('UPDATE orders SET status = ? WHERE id = ?', [status, orderId]);
+  },
+
+  createPaymentRecord: async (data) => {
+    const { order_id, midtrans_order_id, amount, transaction_status } = data;
+    const query = `
+      INSERT INTO payments (order_id, midtrans_order_id, amount, transaction_status) 
+      VALUES (?, ?, ?, ?)
+    `;
+    await db.query(query, [order_id, midtrans_order_id, amount, transaction_status]);
   }
 };
 
