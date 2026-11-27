@@ -9,10 +9,8 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Daftarkan routes
 app.use('/api/auth', authRoutes);
 
-// Endpoint health check
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -22,6 +20,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  // Teks polos tanpa icon dan tanpa env
   console.log(`Server berjalan di http://localhost:${PORT}`);
 });
