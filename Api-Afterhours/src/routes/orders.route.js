@@ -1,28 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const {
-  create,
-  getAll,
-  getMyOrders,
-  getById,
-  updateStatus
-} = require('../controllers/orders.controller');
-const auth = require('../middlewares/auth.middleware');
-const authorize = require('../middlewares/authorize.middleware');
+const orderController = require('../controllers/orders.controller');
+const { verifyToken } = require('../middlewares/auth.middleware');
+const { isAdmin } = require('../middlewares/role.middleware');
 
-// Customer buat pesanan
-router.post('/', auth, create);
+// Rute Customer
+router.post('/', verifyToken, orderController.createOrder);
+router.get('/my-orders', verifyToken, orderController.getMyOrders);
+router.get('/:id', verifyToken, orderController.getOrderDetail); // Bisa diakses admin & customer pemilik
 
-// Customer lihat pesanan sendiri
-router.get('/my', auth, getMyOrders);
-
-// Admin lihat semua pesanan
-router.get('/', auth, authorize('admin'), getAll);
-
-// Detail (admin atau pemilik)
-router.get('/:id', auth, getById);
-
-// Admin ubah status
-router.put('/:id/status', auth, authorize('admin'), updateStatus);
+// Rute Admin
+router.get('/', verifyToken, isAdmin, orderController.getAllOrders);
+router.put('/:id/status', verifyToken, isAdmin, orderController.updateStatus);
 
 module.exports = router;
