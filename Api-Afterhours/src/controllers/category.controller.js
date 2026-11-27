@@ -1,159 +1,72 @@
-const db = require("../config/db");
+const CategoryModel = require('../models/category.models');
 
-const getAll = async (req, res) => {
+exports.getAllCategories = async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT * FROM categories ORDER BY id ASC");
-    res.json({ success: true, data: rows });
-  } catch (err) {
-    console.error("getAll categories error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+    const categories = await CategoryModel.getAll();
+    res.status(200).json({ success: true, data: categories });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const getById = async (req, res) => {
+exports.createCategory = async (req, res) => {
   try {
-    const { id } = req.params;
-    const [rows] = await db.query("SELECT * FROM categories WHERE id = ?", [
-      id,
-    ]);
-
-    if (rows.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Kategori tidak ditemukan" });
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Nama kategori wajib diisi' });
     }
 
-    res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    console.error("getById category error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
-  }
-};
-
-const create = async (req, res) => {
-  try {
-    const { name, description } = req.body;
-
-    if (!name || name.trim() === "") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Nama kategori wajib diisi" });
-    }
-
-    const [existing] = await db.query(
-      "SELECT id FROM categories WHERE name = ?",
-      [name],
-    );
-    if (existing.length > 0) {
-      return res
-        .status(409)
-        .json({ success: false, message: "Nama kategori sudah ada" });
-    }
-
-    const [result] = await db.query(
-      "INSERT INTO categories (name, description) VALUES (?, ?)",
-      [name, description || null],
-    );
-
-    res.status(201).json({
-      success: true,
-      message: "Kategori berhasil dibuat",
-      data: { id: result.insertId, name, description: description || null },
+    const newId = await CategoryModel.create(name);
+    res.status(201).json({ 
+      success: true, 
+      message: 'Kategori berhasil ditambahkan',
+      data: { id: newId, name }
     });
-  } catch (err) {
-    console.error("create category error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const update = async (req, res) => {
+exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name } = req.body;
 
-    const [existing] = await db.query(
-      "SELECT id FROM categories WHERE id = ?",
-      [id],
-    );
-    if (existing.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Kategori tidak ditemukan" });
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Nama kategori wajib diisi' });
     }
 
-    if (!name || name.trim() === "") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Nama kategori wajib diisi" });
+    const category = await CategoryModel.getById(id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Kategori tidak ditemukan' });
     }
 
-    const [duplicate] = await db.query(
-      "SELECT id FROM categories WHERE name = ? AND id != ?",
-      [name, id],
-    );
-    if (duplicate.length > 0) {
-      return res
-        .status(409)
-        .json({ success: false, message: "Nama kategori sudah dipakai" });
-    }
-
-    await db.query(
-      "UPDATE categories SET name = ?, description = ? WHERE id = ?",
-      [name, description || null, id],
-    );
-
-    res.json({
-      success: true,
-      message: "Kategori berhasil diperbarui",
-      data: { id: Number(id), name, description: description || null },
-    });
-  } catch (err) {
-    console.error("update category error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+    await CategoryModel.update(id, name);
+    res.status(200).json({ success: true, message: 'Kategori berhasil diupdate' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
 
-const remove = async (req, res) => {
+exports.deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
-
-    const [existing] = await db.query(
-      "SELECT id FROM categories WHERE id = ?",
-      [id],
-    );
-    if (existing.length === 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Kategori tidak ditemukan" });
+    
+    const category = await CategoryModel.getById(id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Kategori tidak ditemukan' });
     }
 
-    const [usedBy] = await db.query(
-      "SELECT id FROM products WHERE category_id = ? LIMIT 1",
-      [id],
-    );
-    if (usedBy.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Kategori tidak bisa dihapus karena masih dipakai produk",
-      });
+    await CategoryModel.delete(id);
+    res.status(200).json({ success: true, message: 'Kategori berhasil dihapus' });
+  } catch (error) {
+    console.error(error);
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(400).json({ success: false, message: 'Kategori tidak bisa dihapus karena masih digunakan oleh produk' });
     }
-
-    await db.query("DELETE FROM categories WHERE id = ?", [id]);
-    res.json({ success: true, message: "Kategori berhasil dihapus" });
-  } catch (err) {
-    console.error("delete category error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Terjadi kesalahan server" });
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
-
-module.exports = { getAll, getById, create, update, remove };
