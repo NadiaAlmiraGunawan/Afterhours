@@ -1,7 +1,5 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
-// Memanggil users.models (pakai 's' dan titik sesuai nama file kamu)
 const UserModel = require('../models/users.models');
 
 exports.register = async (req, res) => {
@@ -47,24 +45,20 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Validasi input
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
     }
 
-    // 2. Cari user berdasarkan email
     const user = await UserModel.findByEmail(email);
     if (!user) {
       return res.status(401).json({ success: false, message: 'Email atau password salah' });
     }
 
-    // 3. Cocokkan password yang diinput dengan hash di database
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Email atau password salah' });
     }
 
-    // 4. Buat JWT Token
     const payload = {
       id: user.id,
       role: user.role
@@ -74,7 +68,6 @@ exports.login = async (req, res) => {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d'
     });
 
-    // 5. Kirim response (JANGAN kirim password!)
     res.status(200).json({
       success: true,
       message: 'Login berhasil',
@@ -94,10 +87,9 @@ exports.login = async (req, res) => {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
   }
 };
-// TAMBAHKAN FUNGSI INI
+
 exports.getMe = async (req, res) => {
   try {
-    // req.user didapat dari authMiddleware
     const user = await UserModel.findById(req.user.id);
     
     if (!user) {

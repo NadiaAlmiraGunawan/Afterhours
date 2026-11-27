@@ -7,7 +7,6 @@ const UserModel = {
     return rows[0];
   },
 
-  // TAMBAHKAN METHOD INI
   findById: async (id) => {
     const query = 'SELECT id, name, email, role FROM users WHERE id = ?';
     const [rows] = await db.query(query, [id]);

@@ -1,7 +1,6 @@
 exports.isAdmin = (req, res, next) => {
-  // req.user didapat dari authMiddleware yang berjalan sebelumnya
   if (req.user && req.user.role === 'admin') {
-    next(); // Loloskan jika role admin
+    next();
   } else {
     return res.status(403).json({ 
       success: false, 

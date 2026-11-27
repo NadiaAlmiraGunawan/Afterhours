@@ -20,9 +20,15 @@ exports.verifyToken = (req, res, next) => {
     console.error('Error JWT:', error.message);
     
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token sudah kadaluwarsa. Silakan login ulang.' });
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Token sudah kadaluwarsa. Silakan login ulang.' 
+      });
     }
     
-    return res.status(401).json({ success: false, message: 'Token tidak valid.' });
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Token tidak valid.' 
+    });
   }
 };
